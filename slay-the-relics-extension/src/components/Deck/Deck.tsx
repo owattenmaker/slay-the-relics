@@ -12,6 +12,7 @@ import { ReturnButton } from "../Buttons/Buttons";
 import { Cards, LocalizationContext } from "../Localization/Localization";
 import ReactDOMServer from "react-dom/server";
 import { PlacesType } from "react-tooltip";
+import { useCardImage } from "./useCardImage";
 
 const GITHUB_RAW_BASE =
   "https://raw.githubusercontent.com/Spireblight/slay-the-relics/refs/heads/master/";
@@ -154,6 +155,7 @@ export function Card(props: {
   character: string;
   onClick: () => void;
   additionalClasses: string;
+  visible: boolean;
   cardTips?: Record<string, Tip[]>;
   game?: string;
 }) {
@@ -167,7 +169,11 @@ export function Card(props: {
 
   const normalName = name.replaceAll("+", "");
   const lookupKey = key.replaceAll("+", "");
-  const imgUrl = cardImageUrl(name, upgraded, props.game);
+  const imgUrl = useCardImage(
+    cardImageUrl(name, upgraded, props.game),
+    props.game,
+    props.visible,
+  );
 
   const cardStyle: CSSProperties = {
     backgroundImage: `url(${imgUrl})`,
@@ -425,6 +431,7 @@ export function CardView(props: {
           bottle={bottle}
           character={props.character}
           additionalClasses={"card-view-card"}
+          visible={props.display !== "hidden"}
           onClick={closeCard}
           cardTips={props.cardTips}
           game={props.game}
@@ -500,6 +507,7 @@ export function CardGrid(props: {
               data={card}
               bottle={bottle}
               additionalClasses={"deck-card"}
+              visible={props.deckViewMode !== "hidden"}
               character={props.character}
               onClick={() => {
                 props.setCardIndex(i);
