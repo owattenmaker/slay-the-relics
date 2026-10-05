@@ -57,20 +57,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const originalUrl = (filename: string, game = "sts1") =>
+  `https://raw.githubusercontent.com/Spireblight/slay-the-relics/refs/heads/master/assets/${game}/card-images/${filename}.png`;
+
 describe("card previews", () => {
-  it("maps both games and upgraded filenames to bundled WebP previews", () => {
-    expect(cardPreviewUrl("https://example.com/bashplus1.png")).toBe(
-      "data:image/webp;base64,bashplus1",
+  it("resolves upgraded card data and variants for both games", () => {
+    const sts1 = renderHook(() =>
+      useCardImage({ data: ["Bash+", 3], visible: true }),
     );
+    expect(sts1.result.current).toBe("data:image/webp;base64,bashplus1");
+    expect(request(originalUrl("bashplus1"))).toBeDefined();
+
+    const sts2 = renderHook(() =>
+      useCardImage({
+        data: "STRIKE_IRONCLAD+\u001Fburn:2\u001Fbound",
+        game: "sts2",
+        visible: true,
+      }),
+    );
+    expect(sts2.result.current).toBe("data:image/webp;base64,sts2-upgrade");
     expect(
-      cardPreviewUrl("https://example.com/strike_ironcladplusone.png", "sts2"),
-    ).toBe("data:image/webp;base64,sts2-upgrade");
+      request(originalUrl("strike_ironcladplusone", "sts2")),
+    ).toBeDefined();
   });
 
   it("warms previews while hidden and downloads originals only when opened", () => {
-    const url = "https://example.com/hidden.png";
+    const url = originalUrl("hidden", "sts2");
     const { result, rerender } = renderHook(
-      ({ visible }) => useCardImage(url, "sts2", visible),
+      ({ visible }) => useCardImage({ data: "hidden", game: "sts2", visible }),
       { initialProps: { visible: false } },
     );
     expect(result.current).toBe(cardPreviewUrl(url, "sts2"));
@@ -82,9 +96,9 @@ describe("card previews", () => {
   });
 
   it("keeps the preview until the original has decoded, then reuses it on reopen", async () => {
-    const url = "https://example.com/decoded.png";
+    const url = originalUrl("decoded");
     const { result, unmount } = renderHook(() =>
-      useCardImage(url, "sts1", true),
+      useCardImage({ data: "decoded", game: "sts1", visible: true }),
     );
     let finishDecode!: () => void;
     request(url).decode.mockReturnValue(
@@ -101,7 +115,9 @@ describe("card previews", () => {
     });
     expect(result.current).toBe(url);
     unmount();
-    const reopened = renderHook(() => useCardImage(url, "sts1", true));
+    const reopened = renderHook(() =>
+      useCardImage({ data: "decoded", game: "sts1", visible: true }),
+    );
     expect(reopened.result.current).toBe(url);
     expect(
       MockImage.requests.filter((image) => image.src === url),
@@ -109,9 +125,13 @@ describe("card previews", () => {
   });
 
   it("shares in-flight requests between duplicate cards", async () => {
-    const url = "https://example.com/duplicate.png";
-    const first = renderHook(() => useCardImage(url, undefined, true));
-    const second = renderHook(() => useCardImage(url, undefined, true));
+    const url = originalUrl("duplicate");
+    const first = renderHook(() =>
+      useCardImage({ data: "duplicate", visible: true }),
+    );
+    const second = renderHook(() =>
+      useCardImage({ data: "duplicate", visible: true }),
+    );
     expect(MockImage.requests).toHaveLength(2);
     await flushImage(() => {
       request(url).onload?.();
@@ -121,13 +141,13 @@ describe("card previews", () => {
   });
 
   it("does not apply a late result to a different card or upgrade", async () => {
-    const base = "https://example.com/changing.png";
-    const upgrade = "https://example.com/changingplus1.png";
+    const base = originalUrl("changing");
+    const upgrade = originalUrl("changingplus1");
     const { result, rerender } = renderHook(
-      ({ url }) => useCardImage(url, undefined, true),
-      { initialProps: { url: base } },
+      ({ data }) => useCardImage({ data, visible: true }),
+      { initialProps: { data: "changing" } },
     );
-    rerender({ url: upgrade });
+    rerender({ data: "changing+" });
     await flushImage(() => {
       request(base).onload?.();
     });
@@ -136,16 +156,16 @@ describe("card previews", () => {
       request(upgrade).onload?.();
     });
     expect(result.current).toBe(upgrade);
-    rerender({ url: "https://example.com/next.png" });
-    expect(result.current).toBe(cardPreviewUrl("https://example.com/next.png"));
+    rerender({ data: "next" });
+    expect(result.current).toBe(cardPreviewUrl(originalUrl("next")));
   });
 
   it.each(["download", "decode"])(
     "keeps previews after %s failure and retries on reopening",
     async (failure) => {
-      const url = `https://example.com/failure-${failure}.png`;
+      const url = originalUrl(`failure-${failure}`);
       const { result, rerender } = renderHook(
-        ({ visible }) => useCardImage(url, undefined, visible),
+        ({ visible }) => useCardImage({ data: `failure-${failure}`, visible }),
         { initialProps: { visible: true } },
       );
       await flushImage(() => {
@@ -168,8 +188,10 @@ describe("card previews", () => {
   );
 
   it("still loads originals when a preview is missing", async () => {
-    const url = "https://example.com/new-card.png";
-    const { result } = renderHook(() => useCardImage(url, undefined, true));
+    const url = originalUrl("new-card");
+    const { result } = renderHook(() =>
+      useCardImage({ data: "new-card", visible: true }),
+    );
     expect(result.current).toBe(url);
     expect(MockImage.requests).toHaveLength(1);
     await flushImage(() => {

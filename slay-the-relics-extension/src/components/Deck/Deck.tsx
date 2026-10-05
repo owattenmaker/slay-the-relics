@@ -12,10 +12,15 @@ import { ReturnButton } from "../Buttons/Buttons";
 import { Cards, LocalizationContext } from "../Localization/Localization";
 import ReactDOMServer from "react-dom/server";
 import { PlacesType } from "react-tooltip";
-import { useCardImage } from "./useCardImage";
-
-const GITHUB_RAW_BASE =
-  "https://raw.githubusercontent.com/Spireblight/slay-the-relics/refs/heads/master/";
+import { useCardImage, type CardImageProps } from "./useCardImage";
+import {
+  type CardData,
+  KEY_SEPARATOR,
+  cardKey,
+  cardName,
+  formatForSlaytabase,
+} from "./cardData";
+export type { CardData } from "./cardData";
 
 type DeckType = "deck" | "draw" | "discard" | "exhaust";
 type Bottle = "flame" | "lightning" | "tornado" | null;
@@ -25,26 +30,6 @@ function BottleURL(bottle: Bottle): string | null {
     return null;
   }
   return `./img/relics/bottled_${bottle}.png`;
-}
-
-export type CardData = string | [string, number];
-
-// Card keys may contain \u001F-separated variant info: "id\u001FenchantmentId:amount\u001FafflictionId"
-// For STS1, the key is the display name. For STS2, the key is the card ID (e.g. "strike_ironclad").
-// cardKey returns the full key (for dictionary lookups), cardName returns the base name/id only.
-const KEY_SEPARATOR = "\u001F";
-
-function cardKey(card: CardData): string {
-  if (typeof card === "string") {
-    return card;
-  }
-  return card[0];
-}
-
-function cardName(card: CardData): string {
-  const key = cardKey(card);
-  const sep = key.indexOf(KEY_SEPARATOR);
-  return sep === -1 ? key : key.substring(0, sep);
 }
 
 function cardEnchantment(
@@ -99,41 +84,6 @@ function withCardName(card: CardData, fn: (n: string) => string): CardData {
   return [newName, card[1]];
 }
 
-function formatForSlaytabase(val: string): string {
-  return val
-    .split("+")[0]
-    .replaceAll(":", "-")
-    .replaceAll("'", "")
-    .replaceAll(" ", "")
-    .toLowerCase();
-}
-
-function slaytabaseUrlForCard(card: string, upgraded: boolean): string {
-  let formattedCard = encodeURI(formatForSlaytabase(card));
-  if (upgraded) {
-    formattedCard += "plus1";
-  }
-
-  return `https://raw.githubusercontent.com/Spireblight/slay-the-relics/refs/heads/master/assets/sts1/card-images/${formattedCard}.png`;
-}
-
-function sts2UrlForCard(cardId: string, upgraded: boolean): string {
-  const id = cardId.split("+")[0].toLowerCase();
-  const suffix = upgraded ? "plusone" : "";
-  return `${GITHUB_RAW_BASE}assets/sts2/card-images/${id}${suffix}.png`;
-}
-
-function cardImageUrl(
-  name: string,
-  upgraded: boolean,
-  game?: string,
-): string {
-  if (game === "sts2") {
-    return sts2UrlForCard(name, upgraded);
-  }
-  return slaytabaseUrlForCard(name, upgraded);
-}
-
 function lookupCard(name: string, cardsLoc: Cards): string {
   const normalName = name.replaceAll("+", "");
   const upgraded = name.includes("+");
@@ -149,16 +99,15 @@ function lookupCard(name: string, cardsLoc: Cards): string {
   return cardLoc.DESCRIPTION;
 }
 
-export function Card(props: {
-  data: CardData;
-  bottle: Bottle;
-  character: string;
-  onClick: () => void;
-  additionalClasses: string;
-  visible: boolean;
-  cardTips?: Record<string, Tip[]>;
-  game?: string;
-}) {
+export function Card(
+  props: CardImageProps & {
+    bottle: Bottle;
+    character: string;
+    onClick: () => void;
+    additionalClasses: string;
+    cardTips?: Record<string, Tip[]>;
+  },
+) {
   const name = cardName(props.data);
   const key = cardKey(props.data);
   const upgraded = name.includes("+");
@@ -169,11 +118,7 @@ export function Card(props: {
 
   const normalName = name.replaceAll("+", "");
   const lookupKey = key.replaceAll("+", "");
-  const imgUrl = useCardImage(
-    cardImageUrl(name, upgraded, props.game),
-    props.game,
-    props.visible,
-  );
+  const imgUrl = useCardImage(props);
 
   const cardStyle: CSSProperties = {
     backgroundImage: `url(${imgUrl})`,

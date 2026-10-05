@@ -1,5 +1,37 @@
 import { useEffect, useState } from "react";
+import { type CardData, cardName, formatForSlaytabase } from "./cardData";
 import cardPreviews from "../../generated/card-previews.json";
+
+const GITHUB_RAW_BASE =
+  "https://raw.githubusercontent.com/Spireblight/slay-the-relics/refs/heads/master/";
+
+function slaytabaseUrlForCard(card: string, upgraded: boolean): string {
+  let formattedCard = encodeURI(formatForSlaytabase(card));
+  if (upgraded) {
+    formattedCard += "plus1";
+  }
+
+  return `https://raw.githubusercontent.com/Spireblight/slay-the-relics/refs/heads/master/assets/sts1/card-images/${formattedCard}.png`;
+}
+
+function sts2UrlForCard(cardId: string, upgraded: boolean): string {
+  const id = cardId.split("+")[0].toLowerCase();
+  const suffix = upgraded ? "plusone" : "";
+  return `${GITHUB_RAW_BASE}assets/sts2/card-images/${id}${suffix}.png`;
+}
+
+function cardImageUrl(name: string, upgraded: boolean, game?: string): string {
+  if (game === "sts2") {
+    return sts2UrlForCard(name, upgraded);
+  }
+  return slaytabaseUrlForCard(name, upgraded);
+}
+
+export interface CardImageProps {
+  data: CardData;
+  game?: string;
+  visible: boolean;
+}
 
 const previews: Record<string, Record<string, string>> = cardPreviews;
 
@@ -36,11 +68,9 @@ export function cardPreviewUrl(imageUrl: string, game?: string): string {
   return previews[game === "sts2" ? "sts2" : "sts1"][filename] ?? imageUrl;
 }
 
-export function useCardImage(
-  imageUrl: string,
-  game: string | undefined,
-  visible: boolean,
-): string {
+export function useCardImage({ data, game, visible }: CardImageProps): string {
+  const name = cardName(data);
+  const imageUrl = cardImageUrl(name, name.includes("+"), game);
   const previewUrl = cardPreviewUrl(imageUrl, game);
   const [loadedUrl, setLoadedUrl] = useState<string>();
 
