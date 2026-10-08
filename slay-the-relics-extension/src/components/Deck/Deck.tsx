@@ -118,7 +118,11 @@ export function Card(
 
   const normalName = name.replaceAll("+", "");
   const lookupKey = key.replaceAll("+", "");
-  const imgUrl = useCardImage(props);
+  const imgUrl = useCardImage({
+    data: props.data,
+    game: props.game,
+    visible: props.visible,
+  });
 
   const cardStyle: CSSProperties = {
     backgroundImage: `url(${imgUrl})`,
